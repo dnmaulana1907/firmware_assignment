@@ -90,7 +90,7 @@ print("--- STARTING POST-BUILD PROCESSING ---")
 print(f"Target file: {output_bin}")
 
 # 1. Get Application Version (First 3 bytes of the binary)
-buffer_version = get_data_from_file(output_bin, 3, 0)
+buffer_version = get_data_from_file(output_bin, 4, 0)
 version_in_array = convert_to_array(buffer_version)
 print(f"Detected Version: {version_in_array}")
 
