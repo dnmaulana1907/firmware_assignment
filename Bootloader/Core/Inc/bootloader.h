@@ -9,6 +9,5 @@
 #define INC_BOOTLOADER_H_
 
 
-void start_bootloader(void);
-
+void run_bootloader(void);
 #endif /* INC_BOOTLOADER_H_ */
