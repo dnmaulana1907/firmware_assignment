@@ -8,12 +8,21 @@
 #include "bootloader.h"
 #include "flash_layout.h"
 #include "app_header.h"
-
+#include "authentication.h"
+//#include <stdint.h>
 
 #define APP_MAGIC	0xABCDEFAB
 typedef void(*pFunction)(void);
 
-void start_bootloader(void){
+static void check_authentication(void){
+//	uint8_t status;
+	uint32_t addres = APPLICATION_START_ADDRESS;
+
+	uint32_t size = get_size(addres, 4);
+	printf("Size Flash %lu KB\r\n", size);
+}
+
+static void start_application(void){
 	uint32_t app_stack;
 	pFunction app_entry;
 
@@ -39,3 +48,8 @@ void start_bootloader(void){
 	app_entry();
 }
 
+void run_bootloader(void)
+{
+	check_authentication();
+	start_application();
+}

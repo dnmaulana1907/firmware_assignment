@@ -18,13 +18,14 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "crc.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "bootloader.h"
-#include <stdio.h>
+#include "flash.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,7 +57,8 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+uint8_t buff_test;
+uint32_t crc_res;
 /* USER CODE END 0 */
 
 /**
@@ -89,18 +91,11 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_CRC_Init();
   /* USER CODE BEGIN 2 */
   printf("Start Bootloader...\r\n");
   HAL_Delay(100);
-//  if(bootloader_is_app_valid() != 0) {
-//	  printf("Bootloader is not valid\r\n");
-//	  while(1)
-//	  {
-//		  HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
-//		  HAL_Delay(200);
-//	  }
-//  }
-  start_bootloader();
+  run_bootloader();
   /* USER CODE END 2 */
 
   /* Infinite loop */
