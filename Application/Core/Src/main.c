@@ -63,12 +63,12 @@ struct fw_version_s
 	uint8_t major;
 	uint8_t minor;
 	uint8_t version;
-	uint8_t reserve;
+	uint8_t update_flag;
 } fw_version __attribute__ ((section(".fw_version"))) = {
 		.major = 0,
 		.minor = 1,
 		.version = 1,
-		.reserve = 0
+		.update_flag = 0
 };
 
 uint8_t fw_size[4] __attribute__ ((section(".fw_size"))) = {0x00};
