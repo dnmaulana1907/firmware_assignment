@@ -10,8 +10,7 @@
 
 #include "main.h"
 
-uint32_t CalculateCRC(uint8_t *Data, uint32_t Length);
 void re_initCRC(void);
-
+uint32_t CalculateCRC_Software(const uint8_t *pData, uint32_t Size);
 
 #endif /* INC_CHECKSUM_H_ */

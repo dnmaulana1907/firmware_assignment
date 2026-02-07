@@ -67,7 +67,21 @@ void Error_Handler(void);
 #define LED_BLUE_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
+#define		SOT		0x01U
+#define		EOT		0x04U
 
+#define		LAST_INDEX	519U
+
+
+typedef struct {
+
+	uint8_t write_permission;
+	uint8_t processing_data;
+	uint32_t current_offset;
+
+}FirmwareProcessData_s;
+
+extern FirmwareProcessData_s FirmwareProcessData;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

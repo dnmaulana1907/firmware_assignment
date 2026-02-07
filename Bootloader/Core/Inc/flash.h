@@ -20,8 +20,11 @@ typedef enum {
 	FLASH_ERR_ALIGNMENT
 } FlashOp_Status_t;
 
-FlashOp_Status_t Flash_Erase_Range(uint32_t startAddr, uint32_t length);
-FlashOp_Status_t Flash_Write_Data(uint32_t destAddr, const uint8_t *data, uint32_t length);
-void Flash_Read_Data(uint32_t srcAddr, uint8_t *buffer, uint32_t length);
+
+
+FlashOp_Status_t flash_erase_range(uint32_t startAddr, uint32_t length);
+FlashOp_Status_t flash_write_data(uint32_t destAddr, const uint8_t *data, uint32_t length);
+FlashOp_Status_t flash_write_firmware(uint32_t destAddr, const uint8_t *data, uint32_t length);
+void flash_read_data(uint32_t srcAddr, uint8_t *buffer, uint32_t length);
 
 #endif /* INC_FLASH_H_ */

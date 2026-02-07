@@ -8,7 +8,7 @@
 #include <string.h>
 
 
-static uint32_t GetSector(uint32_t Address) {
+static uint32_t get_sector(uint32_t Address) {
     uint32_t sector = 0;
 
     if((Address < 0x08004000) && (Address >= 0x08000000)) {
@@ -39,7 +39,7 @@ static uint32_t GetSector(uint32_t Address) {
     return sector;
 }
 
-FlashOp_Status_t Flash_Erase_Range(uint32_t startAddr, uint32_t length) {
+FlashOp_Status_t flash_erase_range(uint32_t startAddr, uint32_t length) {
     FlashOp_Status_t status = FLASH_OK_STATUS;
     uint32_t FirstSector, NbOfSectors, SectorError;
     FLASH_EraseInitTypeDef EraseInitStruct;
@@ -47,11 +47,10 @@ FlashOp_Status_t Flash_Erase_Range(uint32_t startAddr, uint32_t length) {
 
     HAL_FLASH_Unlock();
 
-    FirstSector = GetSector(startAddr);
-    uint32_t LastSector = GetSector(startAddr + length - 1);
+    FirstSector = get_sector(startAddr);
+    uint32_t LastSector = get_sector(startAddr + length - 1);
     NbOfSectors = LastSector - FirstSector + 1;
 
-    // 3. Konfigurasi Erase
     EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
     EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
     EraseInitStruct.Sector        = FirstSector;
@@ -66,16 +65,18 @@ FlashOp_Status_t Flash_Erase_Range(uint32_t startAddr, uint32_t length) {
     return status;
 }
 
-FlashOp_Status_t Flash_Write_Data(uint32_t destAddr, const uint8_t *data, uint32_t length) {
+FlashOp_Status_t flash_write_data(uint32_t destAddr, const uint8_t *data, uint32_t length) {
     FlashOp_Status_t status = FLASH_OK_STATUS;
 
     HAL_FLASH_Unlock();
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                           FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
 
     for (uint32_t i = 0; i < length; i += 4) {
         uint32_t currentAddr = destAddr + i;
         uint32_t wordData = 0xFFFFFFFF;
-
         uint32_t bytesRemaining = length - i;
+
         if (bytesRemaining >= 4) {
             memcpy(&wordData, &data[i], 4);
         } else {
@@ -97,7 +98,44 @@ FlashOp_Status_t Flash_Write_Data(uint32_t destAddr, const uint8_t *data, uint32
     return status;
 }
 
-void Flash_Read_Data(uint32_t srcAddr, uint8_t *buffer, uint32_t length) {
+FlashOp_Status_t flash_write_firmware(uint32_t destAddr, const uint8_t *data, uint32_t length) {
+
+    if (destAddr % 4 != 0) return FLASH_ERR_ALIGNMENT;
+
+    FlashOp_Status_t status = FLASH_OK_STATUS;
+
+    HAL_FLASH_Unlock();
+
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                           FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
+
+    for (uint32_t i = 0; i < length; i += 4) {
+        uint32_t currentAddr = destAddr + i;
+        uint32_t wordData = 0xFFFFFFFF;
+
+        uint32_t bytesRemaining = length - i;
+        if (bytesRemaining >= 4) {
+            memcpy(&wordData, &data[i], 4);
+
+            memcpy(&wordData, &data[i], bytesRemaining);
+        }
+
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, currentAddr, wordData) != HAL_OK) {
+            status = FLASH_ERR_WRITE;
+            break;
+        }
+
+        if (*(volatile uint32_t*)currentAddr != wordData) {
+            status = FLASH_ERR_WRITE;
+            break;
+        }
+    }
+
+    HAL_FLASH_Lock();
+    return status;
+}
+
+void flash_read_data(uint32_t srcAddr, uint8_t *buffer, uint32_t length) {
     memcpy(buffer, (void*)srcAddr, length);
 }
 
