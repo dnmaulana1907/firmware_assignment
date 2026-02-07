@@ -19,12 +19,12 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "crc.h"
+#include "iwdg.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "flash_layout.h"
 #include <stdio.h>
 #include <stdint.h>
 /* USER CODE END Includes */
@@ -47,13 +47,15 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+uint8_t button_flag = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 __inline static void vector_table_app(void);
+__inline static void delete_update_flag(void);
+__inline static void enable_update_flag(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -63,16 +65,17 @@ struct fw_version_s
 	uint8_t major;
 	uint8_t minor;
 	uint8_t version;
-	uint8_t update_flag;
+	uint8_t reserve;
 } fw_version __attribute__ ((section(".fw_version"))) = {
 		.major = 0,
 		.minor = 1,
-		.version = 1,
-		.update_flag = 0
+		.version = 4,
+		.reserve = 0
 };
 
-uint8_t fw_size[4] __attribute__ ((section(".fw_size"))) = {0x00};
+uint8_t fw_size[4] __attribute__ ((section(".fw_size"), aligned(4))) = {0x00};
 uint8_t signature[32] __attribute__ ((section(".fw_signature")))= {0x00};
+
 /* USER CODE END 0 */
 
 /**
@@ -105,10 +108,12 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_CRC_Init();
-  MX_USART2_UART_Init();
+  MX_USART1_UART_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   printf("Start Application...\r\n");
   printf("version: %u.%u.%u\r\n", fw_version.major,fw_version.minor,fw_version.version);
+  delete_update_flag();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -117,6 +122,16 @@ int main(void)
   {
 	  HAL_GPIO_TogglePin(LED_ORANGE_GPIO_Port, LED_ORANGE_Pin);
 	  HAL_Delay(500);
+
+	  if(button_flag)
+	  {
+		  button_flag = 0;
+		  HAL_Delay(50);
+		  HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+		  enable_update_flag();
+		  HAL_NVIC_SystemReset();
+	  }
+//	  HAL_IWDG_Refresh(&hiwdg);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -141,8 +156,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
@@ -173,14 +189,42 @@ void SystemClock_Config(void)
 
 int _write(int file, char *ptr, int len)
 {
-  HAL_UART_Transmit(&huart2, (uint8_t*)ptr, len, HAL_MAX_DELAY);
-  return len;
+	for (int i = 0; i < len; i++) {
+	    ITM_SendChar((*ptr++));
+	  }
+	  return len;
 }
 
-__inline static void vector_table_app(void){
-	SCB->VTOR = /*APPLICATION_START_ADDRESS*/0x08008200;
+
+__inline static void vector_table_app(void)
+{
+	SCB->VTOR = APPLICATION_START_ADDRESS + VEC_OFFSET;
 	__enable_irq();
 }
+
+__inline static void delete_update_flag(void)
+{
+	  uint8_t flag = 0x00U;
+	  Flash_Erase_Range(UPDATE_FLAG_ADDRESS, 1);
+	  Flash_Write_Data(UPDATE_FLAG_ADDRESS, &flag, 1);
+}
+
+__inline static void enable_update_flag(void)
+{
+	  uint8_t flag = 0x01U;
+	  Flash_Erase_Range(UPDATE_FLAG_ADDRESS, 1);
+	  Flash_Write_Data(UPDATE_FLAG_ADDRESS, &flag, 1);
+}
+
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == BUTTON_Pin)
+	{
+		button_flag = 1;
+	}
+}
+
 /* USER CODE END 4 */
 
 /**
