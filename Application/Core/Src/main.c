@@ -54,7 +54,6 @@ uint8_t button_flag = 0;
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 __inline static void vector_table_app(void);
-__inline static void delete_update_flag(void);
 __inline static void enable_update_flag(void);
 /* USER CODE END PFP */
 
@@ -113,7 +112,6 @@ int main(void)
   /* USER CODE BEGIN 2 */
   printf("Start Application...\r\n");
   printf("version: %u.%u.%u\r\n", fw_version.major,fw_version.minor,fw_version.version);
-  delete_update_flag();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -202,18 +200,12 @@ __inline static void vector_table_app(void)
 	__enable_irq();
 }
 
-__inline static void delete_update_flag(void)
-{
-	  uint8_t flag = 0x00U;
-	  Flash_Erase_Range(UPDATE_FLAG_ADDRESS, 1);
-	  Flash_Write_Data(UPDATE_FLAG_ADDRESS, &flag, 1);
-}
 
 __inline static void enable_update_flag(void)
 {
 	  uint8_t flag = 0x01U;
-	  Flash_Erase_Range(UPDATE_FLAG_ADDRESS, 1);
-	  Flash_Write_Data(UPDATE_FLAG_ADDRESS, &flag, 1);
+	  flash_erase_range(UPDATE_FLAG_ADDRESS, 1);
+	  flash_write_data(UPDATE_FLAG_ADDRESS, &flag, 1);
 }
 
 

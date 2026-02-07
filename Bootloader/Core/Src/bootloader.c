@@ -8,7 +8,6 @@
 #include "usart.h"
 #include "bootloader.h"
 #include "flash_layout.h"
-#include "app_header.h"
 #include "authentication.h"
 #include "flash.h"
 #include "firmware_update.h"
@@ -26,6 +25,32 @@ __inline static void validation_handle(uint32_t address)
 	firmware_validation_status = RESET;
 	firmware_validation_status = check_firmware_validation(address);
 	printf("Firmware Validation Status : %u...\r\n", firmware_validation_status);
+
+	if(firmware_validation_status != SUCCESS)
+	{
+		uint32_t size_backup = get_size(APPLICATION_BACKUP_ADDRESS, GET_LENGTH_SIZE);
+
+		if(address == APPLICATION_START_ADDRESS)
+		{
+			printf("Main Corrupt! Checking Backup Integrity...\r\n");
+
+			if(size_backup != 0xFFFFFFFF){
+				if(apps_verificaton(APPLICATION_BACKUP_ADDRESS, size_backup) != SUCCESS)
+				{
+					printf("Backup OK. Restoring to Main...\r\n");
+					load_previous_firmware();
+					HAL_NVIC_SystemReset();
+				}
+			}
+			printf("FATAL: No valid firmware found. System Halted.\r\n");
+			while(1);
+		}
+		else
+		{
+			printf("Backup File is Not Valid....\r\n");
+			flash_erase_range(APPLICATION_BACKUP_ADDRESS, size_backup);
+		}
+	}
 }
 
 static void reset_cause_check(void)
@@ -89,7 +114,7 @@ static void check_update_available(void)
 		if (reset_flag != SOFT_RESET && reset_flag != IWDG_RES)
 		{
 			printf("Normal boot...\r\n");
-			UpdateStatus = NORMAL_BOOT;
+			UpdateStatus = CHECK_MAIN_APP;
 		}else{
 
 			if(reset_flag == SOFT_RESET)
@@ -150,11 +175,6 @@ static void check_authentication(void){
 		printf("Update status : Update Firmware...\r\n");
 		download_new_firmware();
 		check_firmware_validation(APPLICATION_START_ADDRESS);
-		if(firmware_validation_status != SUCCESS)
-		{
-			backup_current_firmware();
-			HAL_NVIC_SystemReset();
-		}
 		HAL_NVIC_SystemReset();
 		/*Writing Code To Main Application*/
 		break;
