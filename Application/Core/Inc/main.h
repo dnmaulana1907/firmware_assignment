@@ -71,7 +71,18 @@ void Error_Handler(void);
 #define LED_BLUE_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
+#define	LEFT_SHIFT(N)		(1U << N)
+#define	UART_SIZE			128U
 
+typedef enum {
+	UPDATE_SIGNAL = LEFT_SHIFT(0),
+	UART_SIGNAL = LEFT_SHIFT(1),
+	ADC_SIGNAL = LEFT_SHIFT(2),
+	I2C_SIGNAL = LEFT_SHIFT(3)
+}ISR_Signals_t;
+
+
+extern uint8_t uart_rx_buf[UART_SIZE];
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

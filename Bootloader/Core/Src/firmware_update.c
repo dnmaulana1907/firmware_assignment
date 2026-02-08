@@ -173,7 +173,7 @@ uint8_t check_firmware_validation(uint32_t address)
 	}
 	else
 	{
-		printf("Application in Address Address : 0x%08lX is valid\r\n", address);
+		printf("Application in Address : 0x%08lX is valid\r\n", address);
 		return SUCCESS;
 	}
 }

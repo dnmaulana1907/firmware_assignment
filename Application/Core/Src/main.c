@@ -18,7 +18,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
+#include "adc.h"
 #include "crc.h"
+#include "dma.h"
 #include "iwdg.h"
 #include "usart.h"
 #include "gpio.h"
@@ -47,11 +50,17 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t button_flag = 0;
+extern DMA_HandleTypeDef hdma_usart1_rx;
+
+extern osThreadId UpdateTaskHandle;
+
+
+uint8_t uart_rx_buf[UART_SIZE];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 __inline static void vector_table_app(void);
 __inline static void enable_update_flag(void);
@@ -68,7 +77,7 @@ struct fw_version_s
 } fw_version __attribute__ ((section(".fw_version"))) = {
 		.major = 0,
 		.minor = 1,
-		.version = 4,
+		.version = 6,
 		.reserve = 0
 };
 
@@ -106,30 +115,31 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_CRC_Init();
   MX_USART1_UART_Init();
-  MX_IWDG_Init();
+//  MX_IWDG_Init();
+  MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
   printf("Start Application...\r\n");
   printf("version: %u.%u.%u\r\n", fw_version.major,fw_version.minor,fw_version.version);
+
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_buf, UART_SIZE);
+  __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
   /* USER CODE END 2 */
+
+  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_GPIO_TogglePin(LED_ORANGE_GPIO_Port, LED_ORANGE_Pin);
-	  HAL_Delay(500);
-
-	  if(button_flag)
-	  {
-		  button_flag = 0;
-		  HAL_Delay(50);
-		  HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-		  enable_update_flag();
-		  HAL_NVIC_SystemReset();
-	  }
-//	  HAL_IWDG_Refresh(&hiwdg);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -213,11 +223,41 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == BUTTON_Pin)
 	{
-		button_flag = 1;
+		osSignalSet(UpdateTaskHandle, UPDATE_SIGNAL);
+	}
+}
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+	if(huart->Instance == USART1)
+	{
+		osSignalSet(UpdateTaskHandle, UART_SIGNAL);
 	}
 }
 
 /* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM1 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM1)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
