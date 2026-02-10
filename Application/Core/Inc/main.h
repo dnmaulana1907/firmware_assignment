@@ -63,12 +63,6 @@ void Error_Handler(void);
 #define BUTTON_EXTI_IRQn EXTI0_IRQn
 #define LED_GREEN_Pin GPIO_PIN_12
 #define LED_GREEN_GPIO_Port GPIOD
-#define LED_ORANGE_Pin GPIO_PIN_13
-#define LED_ORANGE_GPIO_Port GPIOD
-#define LED_RED_Pin GPIO_PIN_14
-#define LED_RED_GPIO_Port GPIOD
-#define LED_BLUE_Pin GPIO_PIN_15
-#define LED_BLUE_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
 #define	LEFT_SHIFT(N)		(1U << N)
