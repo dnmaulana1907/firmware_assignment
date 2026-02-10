@@ -27,7 +27,7 @@
 #define WDT_ALL_TASK			WDT_TASK_TELE | WDT_TASK_UPDATE
 
 #define SENSOR_INTERVAL_MS		5000
-#define IDLE_TIME_OUT_MS		10000
+#define IDLE_TIME_OUT_MS		30000
 #define IDLE_WAITING_MS			1000
 #define ADC_POLLING_MS			20
 #define RTC_WAKEUP_COUNTER		15999
@@ -161,7 +161,7 @@ void task_monitoring_process(void)
 		{
 			HAL_IWDG_Refresh(&hiwdg);
 			HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-			printf("[MONITORING_TASK]: Reported--\r\n");
+			printf("[MONITORING_TASK]: All Task is Safe\r\n");
 			current_flag = RESET;
 		}
 	}
@@ -197,7 +197,7 @@ void task_telemetry_process(void)
 		switch(currentState)
 		{
 		case STATE_INIT:
-			printf("[TELEMETRY_TASK] Init telemetry and timer\r\n");
+			printf("[TELEMETRY_TASK] Init Telemetry and Timer\r\n");
 
 			SensorTimerHandle = osTimerCreate(osTimer(SensorTimer), osTimerPeriodic, NULL);
 			osTimerStart(SensorTimerHandle, SENSOR_INTERVAL_MS);
@@ -242,6 +242,7 @@ void task_telemetry_process(void)
 					printf("[TELEMETRY_TASK] Error parsing GPS Data ...\r\n");
 					currentState = STATE_ERROR;
 				}
+
 			}
 
 			printf("[TELEMETRY_TASK] Read BME280...\r\n");
@@ -277,33 +278,32 @@ void task_telemetry_process(void)
 			}
 			HAL_ADC_Stop(&hadc2);
 
+			currentState = (currentState == STATE_READ) ? STATE_TRANSMIT : STATE_ERROR;
 
-
-			currentState = STATE_TRANSMIT;
 			break;
 		case STATE_TRANSMIT:
-			printf("---[TELEMETRY_TASK] DATA TRANSMIT---\r\n");
+			printf("TELEMETRY_TASK] DATA TRANSMIT\r\n");
 			printf("------------------------------------r\n");
-			printf("---[TELEMETRY_TASK] DATA FUEL---\r\n");
+			printf("=====[TELEMETRY_TASK] DATA FUEL=====\r\n");
 			printf(" Fuel 		: %.1f%% Percent\r\n", fuel_percentage);
-			printf(" ------------------------------------r\n");
-			printf("---[TELEMETRY_TASK] DATA BME280---\r\n");
+			printf(" ------------------------------------\r\n");
+			printf("====[TELEMETRY_TASK] DATA BME280=====r\n");
 			printf(" Pressure 	: %.2f%%  Pascal\r\n", press);
 			printf(" Temperature: %.1f%%  Celsius\r\n", temp);
 			printf(" Humidity	: %.2f%%  Percent\r\n", hum);
-			printf("------------------------------------r\n");
-			printf("---[TELEMETRY_TASK] DATA GPS QUECTEL---\r\n");
+			printf("------------------------------------\r\n");
+			printf("=====TELEMETRY_TASK] DATA GPS QUECTEL=====\r\n");
 			printf("Time UTC	: %s\r\n", gps_data.utc_time);
 			printf("Status		: %c\r\n", gps_data.status);
 			printf("Coordinate	: %.8f %c, %.8f %c\r\n", gps_data.latitude,gps_data.ns_indicator,gps_data.longitude,gps_data.ew_indicator);
 			printf("Speed		: %.3f Knots\r\n", gps_data.speed_knot);
 			printf("Date		: %s \r\n", gps_data.date);
 			printf("Mode		: %d \r\n", gps_data.mode_indicator);
-			printf("------------------------------------r\n");
+			printf("------------------------------------\r\n");
 			currentState = STATE_IDLE;
 			break;
 		case STATE_STOP:
-
+			HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, RESET);
 			printf("[TELEMETRY_TASK] No GPS Activity more than 30s. Entering STOP Mode \r\n");
 			osDelay(20);
 			HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, RTC_WAKEUP_COUNTER, RTC_WAKEUPCLOCK_RTCCLK_DIV16);
@@ -316,6 +316,10 @@ void task_telemetry_process(void)
 			currentState = STATE_IDLE;
 			break;
 		case STATE_ERROR:
+			printf("=====ERROR CAUSED TRIGGER=====r\n");
+			memset(uart_rx_buf, 0x0, UART_SIZE);
+			start_receive_gps();
+			currentState = STATE_IDLE;
 			break;
 		default:
 			currentState = STATE_INIT;

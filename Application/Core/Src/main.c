@@ -79,7 +79,7 @@ struct fw_version_s
 } fw_version __attribute__ ((section(".fw_version"))) = {
 		.major = 0,
 		.minor = 1,
-		.version = 2,
+		.version = 0,
 		.reserve = 0
 };
 
