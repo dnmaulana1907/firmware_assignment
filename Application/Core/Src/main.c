@@ -22,7 +22,9 @@
 #include "adc.h"
 #include "crc.h"
 #include "dma.h"
+#include "i2c.h"
 #include "iwdg.h"
+#include "rtc.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -39,7 +41,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define DEBUG_WAIT_MS		10
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -53,9 +55,10 @@
 extern DMA_HandleTypeDef hdma_usart1_rx;
 
 extern osThreadId UpdateTaskHandle;
+extern osThreadId MonitoringTaskHandle;
+extern osThreadId TelemetryTaskHandle;
 
-
-uint8_t uart_rx_buf[UART_SIZE];
+extern osMutexId debugMutexHandle;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,7 +66,6 @@ void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 __inline static void vector_table_app(void);
-__inline static void enable_update_flag(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -77,7 +79,7 @@ struct fw_version_s
 } fw_version __attribute__ ((section(".fw_version"))) = {
 		.major = 0,
 		.minor = 1,
-		.version = 6,
+		.version = 0,
 		.reserve = 0
 };
 
@@ -118,14 +120,14 @@ int main(void)
   MX_DMA_Init();
   MX_CRC_Init();
   MX_USART1_UART_Init();
-//  MX_IWDG_Init();
+  MX_IWDG_Init();
   MX_ADC2_Init();
+  MX_I2C1_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
   printf("Start Application...\r\n");
   printf("version: %u.%u.%u\r\n", fw_version.major,fw_version.minor,fw_version.version);
-
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_buf, UART_SIZE);
-  __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in cmsis_os2.c) */
@@ -197,8 +199,17 @@ void SystemClock_Config(void)
 
 int _write(int file, char *ptr, int len)
 {
-	for (int i = 0; i < len; i++) {
+	if (debugMutexHandle != NULL) {
+	      osMutexWait(debugMutexHandle, DEBUG_WAIT_MS);
+	  }
+
+	  for (int i = 0; i < len; i++)
+	  {
 	    ITM_SendChar((*ptr++));
+	  }
+
+	  if (debugMutexHandle != NULL) {
+	      osMutexRelease(debugMutexHandle);
 	  }
 	  return len;
 }
@@ -211,30 +222,53 @@ __inline static void vector_table_app(void)
 }
 
 
-__inline static void enable_update_flag(void)
-{
-	  uint8_t flag = 0x01U;
-	  flash_erase_range(UPDATE_FLAG_ADDRESS, 1);
-	  flash_write_data(UPDATE_FLAG_ADDRESS, &flag, 1);
-}
-
-
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == BUTTON_Pin)
 	{
+
 		osSignalSet(UpdateTaskHandle, UPDATE_SIGNAL);
+
 	}
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-	if(huart->Instance == USART1)
-	{
-		osSignalSet(UpdateTaskHandle, UART_SIGNAL);
-	}
+    if (huart->Instance == USART1)
+    {
+        if (TelemetryTaskHandle != NULL)
+        {
+            osSignalSet(TelemetryTaskHandle, UART_SIGNAL);
+        }
+    }
 }
 
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART1)
+    {
+        HAL_UARTEx_ReceiveToIdle_DMA(huart, uart_rx_buf, UART_SIZE);
+        __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+    }
+}
+
+void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc)
+{
+//	HAL_PWR_EnableSleepOnExit();
+	HAL_IWDG_Refresh(&hiwdg);
+}
+
+void re_init_uart(void)
+{
+	HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+	__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_7);
+
+	MX_DMA_Init();
+	MX_USART1_UART_Init();
+	__HAL_UART_CLEAR_OREFLAG(&huart1);
+	__HAL_UART_CLEAR_NEFLAG(&huart1);
+	__HAL_UART_CLEAR_FEFLAG(&huart1);
+}
 /* USER CODE END 4 */
 
 /**

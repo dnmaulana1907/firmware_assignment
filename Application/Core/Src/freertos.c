@@ -25,7 +25,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "task_process.h"
+#include "usart.h"
+#include "iwdg.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,7 +48,9 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+extern uint8_t uart_rx_buf[UART_SIZE];
 
+osMutexId debugMutexHandle;
 /* USER CODE END Variables */
 osThreadId MonitoringTaskHandle;
 osThreadId TelemetryTaskHandle;
@@ -53,7 +58,6 @@ osThreadId UpdateTaskHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-
 /* USER CODE END FunctionPrototypes */
 
 void monitoring_task(void const * argument);
@@ -89,6 +93,8 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
+	osMutexDef(debugMutex);
+	debugMutexHandle = osMutexCreate(osMutex(debugMutex));
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
@@ -134,10 +140,7 @@ void monitoring_task(void const * argument)
 {
   /* USER CODE BEGIN monitoring_task */
   /* Infinite loop */
-  for(;;)
-  {
-    osDelay(100);
-  }
+	task_monitoring_process();
   /* USER CODE END monitoring_task */
 }
 
@@ -152,10 +155,7 @@ void telemetry_task(void const * argument)
 {
   /* USER CODE BEGIN telemetry_task */
   /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1000);
-  }
+	task_telemetry_process();
   /* USER CODE END telemetry_task */
 }
 
@@ -172,35 +172,7 @@ void update_task(void const * argument)
 	/* USER CODE BEGIN Private defines */
 
   /* Infinite loop */
-  for(;;)
-  {
-	  osEvent updateEvent = osSignalWait(UPDATE_SIGNAL | UART_SIGNAL, osWaitForever);
-	  if(updateEvent.status == osEventSignal)
-	  {
-		  if (updateEvent.value.signals & UPDATE_SIGNAL)
-		  {
-			  HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
-			  osDelay(200);
-			  osSignalWait(UPDATE_SIGNAL, RESET);
-		  }
-
-		  if (updateEvent.value.signals & UART_SIGNAL)
-		  {
-			  osDelay(10);
-			  osSignalWait(UART_SIGNAL, RESET);
-		  }
-
-		  if(updateEvent.value.signals & ADC_SIGNAL)
-		  {
-			  osSignalWait(ADC_SIGNAL, RESET);
-		  }
-
-		  if(updateEvent.value.signals & I2C_SIGNAL)
-		  {
-			  osSignalWait(I2C_SIGNAL, RESET);
-		  }
-	  }
-  }
+	task_update_process();
   /* USER CODE END update_task */
 }
 
