@@ -264,7 +264,7 @@ void task_telemetry_process(void)
 			temp = (float)temperature_adc/100.0; // Celcius
 			hum = (float)humidity_adc/1024.0; // %RH
 
-			printf("[TELEMETRY_TASK] Reset ADC DMA buffer...\r\n");
+			printf("[TELEMETRY_TASK] Reset ADC buffer...\r\n");
 
 			HAL_ADC_Start(&hadc2);
 			if(HAL_ADC_PollForConversion(&hadc2, ADC_POLLING_MS)== HAL_OK)

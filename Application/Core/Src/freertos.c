@@ -112,7 +112,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* definition and creation of MonitoringTask */
-  osThreadDef(MonitoringTask, monitoring_task, osPriorityAboveNormal, 0, 256);
+  osThreadDef(MonitoringTask, monitoring_task, osPriorityLow, 0, 256);
   MonitoringTaskHandle = osThreadCreate(osThread(MonitoringTask), NULL);
 
   /* definition and creation of TelemetryTask */
@@ -120,7 +120,7 @@ void MX_FREERTOS_Init(void) {
   TelemetryTaskHandle = osThreadCreate(osThread(TelemetryTask), NULL);
 
   /* definition and creation of UpdateTask */
-  osThreadDef(UpdateTask, update_task, osPriorityBelowNormal, 0, 1280);
+  osThreadDef(UpdateTask, update_task, osPriorityNormal, 0, 256);
   UpdateTaskHandle = osThreadCreate(osThread(UpdateTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
