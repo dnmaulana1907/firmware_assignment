@@ -18,13 +18,18 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
+#include "adc.h"
 #include "crc.h"
+#include "dma.h"
+#include "i2c.h"
+#include "iwdg.h"
+#include "rtc.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "flash_layout.h"
 #include <stdio.h>
 #include <stdint.h>
 /* USER CODE END Includes */
@@ -36,7 +41,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define DEBUG_WAIT_MS		10
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,11 +52,18 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+extern DMA_HandleTypeDef hdma_usart1_rx;
 
+extern osThreadId UpdateTaskHandle;
+extern osThreadId MonitoringTaskHandle;
+extern osThreadId TelemetryTaskHandle;
+
+extern osMutexId debugMutexHandle;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
 __inline static void vector_table_app(void);
 /* USER CODE END PFP */
@@ -67,12 +79,13 @@ struct fw_version_s
 } fw_version __attribute__ ((section(".fw_version"))) = {
 		.major = 0,
 		.minor = 1,
-		.version = 1,
+		.version = 0,
 		.reserve = 0
 };
 
-uint8_t fw_size[4] __attribute__ ((section(".fw_size"))) = {0x00};
+uint8_t fw_size[4] __attribute__ ((section(".fw_size"), aligned(4))) = {0x00};
 uint8_t signature[32] __attribute__ ((section(".fw_signature")))= {0x00};
+
 /* USER CODE END 0 */
 
 /**
@@ -104,19 +117,33 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_CRC_Init();
-  MX_USART2_UART_Init();
+  MX_USART1_UART_Init();
+  MX_IWDG_Init();
+  MX_ADC2_Init();
+  MX_I2C1_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
   printf("Start Application...\r\n");
   printf("version: %u.%u.%u\r\n", fw_version.major,fw_version.minor,fw_version.version);
+  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
+
+  HAL_DBGMCU_EnableDBGStopMode();
   /* USER CODE END 2 */
+
+  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_GPIO_TogglePin(LED_ORANGE_GPIO_Port, LED_ORANGE_Pin);
-	  HAL_Delay(500);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -141,8 +168,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
@@ -173,15 +201,99 @@ void SystemClock_Config(void)
 
 int _write(int file, char *ptr, int len)
 {
-  HAL_UART_Transmit(&huart2, (uint8_t*)ptr, len, HAL_MAX_DELAY);
-  return len;
+	if (debugMutexHandle != NULL) {
+	      osMutexWait(debugMutexHandle, DEBUG_WAIT_MS);
+	  }
+
+	  for (int i = 0; i < len; i++)
+	  {
+	    ITM_SendChar((*ptr++));
+	  }
+
+	  if (debugMutexHandle != NULL) {
+	      osMutexRelease(debugMutexHandle);
+	  }
+	  return len;
 }
 
-__inline static void vector_table_app(void){
-	SCB->VTOR = /*APPLICATION_START_ADDRESS*/0x08008200;
+
+__inline static void vector_table_app(void)
+{
+	SCB->VTOR = APPLICATION_START_ADDRESS + VEC_OFFSET;
 	__enable_irq();
 }
+
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == BUTTON_Pin)
+	{
+
+		osSignalSet(UpdateTaskHandle, UPDATE_SIGNAL);
+
+	}
+}
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+    if (huart->Instance == USART1)
+    {
+        if (TelemetryTaskHandle != NULL)
+        {
+            osSignalSet(TelemetryTaskHandle, UART_SIGNAL);
+        }
+    }
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART1)
+    {
+        HAL_UARTEx_ReceiveToIdle_DMA(huart, uart_rx_buf, UART_SIZE);
+        __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+    }
+}
+
+void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc)
+{
+//	HAL_PWR_EnableSleepOnExit();
+	HAL_IWDG_Refresh(&hiwdg);
+}
+
+void re_init_uart(void)
+{
+	HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+	__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_7);
+
+	MX_DMA_Init();
+	MX_USART1_UART_Init();
+	__HAL_UART_CLEAR_OREFLAG(&huart1);
+	__HAL_UART_CLEAR_NEFLAG(&huart1);
+	__HAL_UART_CLEAR_FEFLAG(&huart1);
+}
 /* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM1 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM1)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.

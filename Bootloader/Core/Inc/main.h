@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -57,17 +57,23 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define LED_GREEN_Pin GPIO_PIN_12
-#define LED_GREEN_GPIO_Port GPIOD
-#define LED_ORANGE_Pin GPIO_PIN_13
-#define LED_ORANGE_GPIO_Port GPIOD
-#define LED_RED_Pin GPIO_PIN_14
-#define LED_RED_GPIO_Port GPIOD
-#define LED_BLUE_Pin GPIO_PIN_15
-#define LED_BLUE_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
+#define		SOT		0x01U
+#define		EOT		0x04U
 
+#define		LAST_INDEX	519U
+
+
+typedef struct {
+
+	uint8_t write_permission;
+	uint8_t processing_data;
+	uint32_t current_offset;
+
+}FirmwareProcessData_s;
+
+extern FirmwareProcessData_s FirmwareProcessData;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

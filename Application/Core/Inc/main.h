@@ -31,7 +31,8 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "flash_layout.h"
+#include "flash.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -57,17 +58,26 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define BUTTON_Pin GPIO_PIN_0
+#define BUTTON_GPIO_Port GPIOA
+#define BUTTON_EXTI_IRQn EXTI0_IRQn
 #define LED_GREEN_Pin GPIO_PIN_12
 #define LED_GREEN_GPIO_Port GPIOD
-#define LED_ORANGE_Pin GPIO_PIN_13
-#define LED_ORANGE_GPIO_Port GPIOD
-#define LED_RED_Pin GPIO_PIN_14
-#define LED_RED_GPIO_Port GPIOD
-#define LED_BLUE_Pin GPIO_PIN_15
-#define LED_BLUE_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
+#define	LEFT_SHIFT(N)		(1U << N)
+#define	UART_SIZE			128U
 
+typedef enum {
+	UPDATE_SIGNAL = LEFT_SHIFT(0),
+	UART_SIGNAL = LEFT_SHIFT(1),
+	I2C_SIGNAL = LEFT_SHIFT(2),
+	WAKEUP_SIGNAL = LEFT_SHIFT(3)
+}ISR_Signals_t;
+
+
+extern uint8_t uart_rx_buf[UART_SIZE];
+void re_init_uart(void);
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -18,13 +18,18 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "crc.h"
+#include "dma.h"
+#include "iwdg.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "bootloader.h"
-#include <stdio.h>
+#include "flash.h"
+#include "firmware_update.h"
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,7 +61,11 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+FirmwareProcessData_s FirmwareProcessData;
+uint8_t crc_test[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x70,0x80, 0x84, 0xF4};
+uint32_t reset_flag;
+uint8_t permit_code[PERMIT_SIZE] = {0xAA, 0xAA, 0xAA, 0xAA, 0xAA};
+uint8_t uart_rx_buf[UART_SIZE];
 /* USER CODE END 0 */
 
 /**
@@ -67,7 +76,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -83,32 +91,25 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  reset_flag = RCC ->CSR;
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART2_UART_Init();
+  MX_DMA_Init();
+  MX_CRC_Init();
+  MX_USART1_UART_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   printf("Start Bootloader...\r\n");
-  HAL_Delay(100);
-//  if(bootloader_is_app_valid() != 0) {
-//	  printf("Bootloader is not valid\r\n");
-//	  while(1)
-//	  {
-//		  HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
-//		  HAL_Delay(200);
-//	  }
-//  }
-  start_bootloader();
+  run_bootloader();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	 HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
-	 HAL_Delay(200);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -133,8 +134,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
@@ -164,9 +166,35 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 int _write(int file, char *ptr, int len)
 {
-  HAL_UART_Transmit(&huart2, (uint8_t*)ptr, len, HAL_MAX_DELAY);
-  return len;
+	for (int i = 0; i < len; i++) {
+	    ITM_SendChar((*ptr++));
+	  }
+	  return len;
 }
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+    if (huart->Instance == USART1)
+    {
+    	if(memcmp(uart_rx_buf, permit_code, PERMIT_SIZE) == 0)
+    	{
+    		FirmwareProcessData.write_permission = SET;
+    	}
+
+    	if (uart_rx_buf[LAST_INDEX - LAST_INDEX] == SOT && uart_rx_buf[LAST_INDEX] == EOT && Size == UART_SIZE)
+    	{
+    		FirmwareProcessData.processing_data = SET;
+    	}
+
+    	if(!FirmwareProcessData.processing_data && !FirmwareProcessData.write_permission)
+    	{
+    		memset(uart_rx_buf, 0x0, UART_SIZE);
+    		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_buf, UART_SIZE);
+    		__HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+    	}
+    }
+}
+
 /* USER CODE END 4 */
 
 /**
