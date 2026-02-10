@@ -31,7 +31,7 @@ Located at `0x0802 0000`, the application runs on FreeRTOS with the following ta
 
 | Component | Interface | STM32 Pin | Description | Datasheet|
 | :--- | :--- | :--- | :--- | :--- |
-| **STM32F4 Discovery** | - | - | MCU (STM32F407VGT6) | [Link]([https://drive.google.com/file/d/1mhD7Uf_oiQP9GO_3iPqgNyHZHy8Q4iKb/view?usp=share_link)|
+| **STM32F4 Discovery** | - | - | MCU (STM32F407VGT6) | [Link](https://drive.google.com/file/d/1mhD7Uf_oiQP9GO_3iPqgNyHZHy8Q4iKb/view?usp=share_link)|
 | **Quectel LG290P** | UART (DMA) | `PB6` (TX), `PB7` (RX) | GNSS Module (9600/115200 bps) | [Link](https://drive.google.com/file/d/12X6thVbqKbrnyJQV3zxjC0I-gmP59GG9/view?usp=sharing)|
 | **PPS Signal** | GPIO EXTI | `PA0` | Pulse Per Second for Wakeup (Optional) | - |
 | **BME280** | I2C | `PB8` (SCL), `PB9` (SDA) | Temp, Pressure, Humidity Sensor |[Link](https://drive.google.com/file/d/1_w-kBY3O8H9Q3vl5sqF5BOwwBP2pOsWy/view?usp=sharing) |
