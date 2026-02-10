@@ -128,6 +128,8 @@ int main(void)
   printf("Start Application...\r\n");
   printf("version: %u.%u.%u\r\n", fw_version.major,fw_version.minor,fw_version.version);
   HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
+
+  HAL_DBGMCU_EnableDBGStopMode();
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in cmsis_os2.c) */
